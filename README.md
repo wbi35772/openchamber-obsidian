@@ -9,7 +9,7 @@ clipboard input.
 The same service exposes an HTTP bridge that the Brain pane (and any future agent
 layer) uses to read and write the vault through the Obsidian Local REST API.
 
-> Private repository: <https://github.com/wbi35772/openchamber-obsidian>
+> Open source repository (Apache-2.0): <https://github.com/wbi35772/openchamber-obsidian>
 > Day-to-day handoff notes: [`docs/STATUS.md`](docs/STATUS.md)
 
 ## Features

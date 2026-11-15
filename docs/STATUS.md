@@ -232,10 +232,10 @@ foreach ($f in 'package.json','panel\index.html','panel\main.js','brain\index.ht
 - 导出接口不需要 vaultPath；/obsidian/rest/session/export 是唯一免除 vaultPath 校验的 rest 路由。
 - 已验证：真实会话 ses_e60b87318ffeQlTAaGbNKYWmNI 的 markdown 2879 条消息 / 49 轮 / 480890 字节；plain、last-answer、last-turn、link、id 均返回 200 与预期文本；假宿主面板与左侧 section 均能打开菜单并写入剪贴板。
 
-## 2026-11-15 仓库整理与私有仓库
+## 2026-11-15 仓库整理与开源发布
 
 - 仓库整理：根目录三个调试脚本移入 `scripts/dev/`；补充 `LICENSE`（Apache-2.0）。
 - README 补齐会话归档、复制菜单、`project/register` 与 `session/archive|export` 路由。
-- 新建私有仓库 `wbi35772/openchamber-obsidian`（已验证 `isPrivate: true`），`origin` 指向新仓库；旧公开仓库 `openchamber-obsidian-panel` 改名为 `legacy` 远程保留。
+- 新建仓库 `wbi35772/openchamber-obsidian` 并设为公开（开源，Apache-2.0），`origin` 指向新仓库；旧公开仓库 `openchamber-obsidian-panel` 改名为 `legacy` 远程保留。
 - 新增 `docs/visual-guide.html`：10 个标签页的可视化总览（mermaid 架构/时序/状态图、chartjs 源码与产物体量、d3 目录树、API 过滤表、归档/复制/功能/路线/图标图例）。
 - 同一内容已发布为 Canvas 产物 `06GXXBSJGC1NMJ2QBQRGQRRCXE-openchamber-obsidian`；后续迭代改 `docs/visual-guide.html` 后，用 `canvas_update`（`baseVersion` 取最新版本）重新发布即可。
