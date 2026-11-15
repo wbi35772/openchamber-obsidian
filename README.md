@@ -9,6 +9,9 @@ clipboard input.
 The same service exposes an HTTP bridge that the Brain pane (and any future agent
 layer) uses to read and write the vault through the Obsidian Local REST API.
 
+> Private repository: <https://github.com/wbi35772/openchamber-obsidian>
+> Day-to-day handoff notes: [`docs/STATUS.md`](docs/STATUS.md)
+
 ## Features
 
 - One self-drawn panel with two panes: Brain tasks and the Obsidian surface.
@@ -21,6 +24,13 @@ layer) uses to read and write the vault through the Obsidian Local REST API.
 - Brain pane: project selector (OpenChamber projects + vault-only projects), task
   list by status/priority, status editing, execution-log append, "dispatch to
   agent" (starts an OpenChamber session with the task brief), and note opening.
+- Session archive: exports an OpenChamber session into
+  `会话记录/<project>/<title>-<date>.md`, groups it by user turn, folds tool calls
+  into `<details>`, writes `archive_path` back to the task card, and auto-archives
+  idle sessions every 60 seconds (`auto_archive: false` opts out).
+- Copy menu on each dispatched task, aligned with OpenChamber: session ID, session
+  link, Markdown, plain text, last answer, last turn. Uses the host clipboard with
+  a `navigator.clipboard` fallback.
 - The same Brain implementation powers the full-page view and the left status
   section; the merged panel imports `createBrainPane` directly.
 - Native folder picker for adding a vault (cancel to type a path).
@@ -99,6 +109,7 @@ body: { method, path, body, viewerId }
 | POST | `/obsidian/restart` | Restart Obsidian |
 | POST | `/obsidian/show` | Bring the Obsidian window to the front |
 | GET/POST | `/obsidian/pick` | Native folder picker session |
+| POST | `/obsidian/rest/project/register` | Add the vault project to OpenChamber settings |
 
 Mirror bridge (used by the panel frame loop):
 
@@ -113,9 +124,11 @@ Mirror bridge (used by the panel frame loop):
 Vault REST bridge (used by Brain; all under `/obsidian/rest/`):
 
 `service-info`, `projects`, `note`, `frontmatter`, `append`, `open`, `search`,
-`list`, `outline`, `section`, `write`, `project/init`, `task/create`, `tasks`,
-`config`. Writes use `If-Match` document-map versioning with a single writer and
-412 retry.
+`list`, `outline`, `section`, `write`, `project/init`, `project/register`,
+`task/create`, `tasks`, `session/archive`, `session/export`, `config`. Writes use
+`If-Match` document-map versioning with a single writer and 412 retry.
+`session/export` returns clipboard text (`markdown`, `plain`, `last-answer`,
+`last-turn`, `link`, `id`) and does not require `vaultPath`.
 
 ## Layout storage
 
@@ -130,6 +143,8 @@ side-by-side choice does not override the stacked default.
 - [x] Project auto-binding: OpenChamber project -> vault folder.
 - [x] Task radar: read task notes, edit status, append execution logs.
 - [x] Section-aware context injection into the composer.
+- [x] Session archive into the vault with automatic idle archiving.
+- [x] Copy menu aligned with OpenChamber export options.
 - [ ] Rules wheel injection into a project workspace.
 - [ ] Architecture graph: Canvas + typed edges, Breadcrumbs/Juggl views.
 

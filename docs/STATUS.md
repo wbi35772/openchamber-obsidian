@@ -1,4 +1,4 @@
-# 项目状态快照（2026-11-05）
+# 项目状态快照（2026-11-15）
 
 > 交接文档。用于第二天继续时快速恢复上下文：做到哪、怎么验证、下一步做什么。
 > 最新代码提交见 `git log`；本文件随每次阶段性收尾更新。
@@ -165,7 +165,7 @@ GET  http://127.0.0.1:53253/api/guests/obsidian-panel/service/status
 
 ## 数据位置
 
-- 源码仓库：`D:\Project\Openchamber\初始配置\obsidian-panel`
+- 源码仓库：`D:\Project\Openchamber\初始配置\projects\obsidian-panel`
 - 已安装扩展：`C:\Users\24999\.config\openchamber\extensions\obsidian-panel`
 - 知识库：`D:\brain`；项目目录 `20-笔记/项目/初始配置`
 - Obsidian Local REST API：`27223`（https `27224`），key 在
@@ -176,7 +176,7 @@ GET  http://127.0.0.1:53253/api/guests/obsidian-panel/service/status
 ## 构建 / 同步 / 重载
 
 ```powershell
-cd 'D:\Project\Openchamber\初始配置\obsidian-panel'
+cd 'D:\Project\Openchamber\初始配置\projects\obsidian-panel'
 npm run build
 node --check panel/main.js
 node --check brain/section.js
@@ -231,3 +231,11 @@ foreach ($f in 'package.json','panel\index.html','panel\main.js','brain\index.ht
 - 复制走宿主 `clipboard-write`（host.writeClipboard），不可用时回退 navigator.clipboard；复制 Markdown 时保留工具调用，纯文本默认不带工具调用。
 - 导出接口不需要 vaultPath；/obsidian/rest/session/export 是唯一免除 vaultPath 校验的 rest 路由。
 - 已验证：真实会话 ses_e60b87318ffeQlTAaGbNKYWmNI 的 markdown 2879 条消息 / 49 轮 / 480890 字节；plain、last-answer、last-turn、link、id 均返回 200 与预期文本；假宿主面板与左侧 section 均能打开菜单并写入剪贴板。
+
+## 2026-11-15 仓库整理与私有仓库
+
+- 仓库整理：根目录三个调试脚本移入 `scripts/dev/`；补充 `LICENSE`（Apache-2.0）。
+- README 补齐会话归档、复制菜单、`project/register` 与 `session/archive|export` 路由。
+- 新建私有仓库 `wbi35772/openchamber-obsidian`（已验证 `isPrivate: true`），`origin` 指向新仓库；旧公开仓库 `openchamber-obsidian-panel` 改名为 `legacy` 远程保留。
+- 新增 `docs/visual-guide.html`：10 个标签页的可视化总览（mermaid 架构/时序/状态图、chartjs 源码与产物体量、d3 目录树、API 过滤表、归档/复制/功能/路线/图标图例）。
+- 同一内容已发布为 Canvas 产物 `06GXXBSJGC1NMJ2QBQRGQRRCXE-openchamber-obsidian`；后续迭代改 `docs/visual-guide.html` 后，用 `canvas_update`（`baseVersion` 取最新版本）重新发布即可。

@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenChamber Obsidian Panel · 架构与功能总览</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --bg-soft: #0f131c;
+    --panel: #121722;
+    --panel-2: #161c29;
+    --border: #232b3b;
+    --border-soft: #1b2231;
+    --text: #e7ebf3;
+    --muted: #8f98ad;
+    --dim: #6b7488;
+    --accent: #7c9cff;
+    --accent-2: #4ec9b0;
+    --purple: #c678dd;
+    --amber: #e5c07b;
+    --red: #e06c75;
+    --green: #98c379;
+    --code-bg: #0d1119;
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 14px/1.65 "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre { font-family: var(--mono); }
+  .app { max-width: 1180px; margin: 0 auto; padding: 28px 22px 60px; }
+
+  .hero { position: relative; padding: 26px 28px; border: 1px solid var(--border); border-radius: 18px;
+    background: radial-gradient(1200px 260px at 12% -40%, rgba(124,156,255,.16), transparent 60%),
+                radial-gradient(900px 240px at 88% -50%, rgba(78,201,176,.12), transparent 60%),
+                var(--panel); overflow: hidden; }
+  .hero h1 { margin: 14px 0 6px; font-size: 28px; letter-spacing: .2px; }
+  .hero p.sub { margin: 0; color: var(--muted); max-width: 760px; }
+  .logo-row { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(124,156,255,.22), rgba(198,120,221,.18));
+    border: 1px solid rgba(124,156,255,.35); }
+  .logo svg { width: 28px; height: 28px; }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); font-size: 12px; }
+  .badge b { color: var(--text); font-weight: 600; }
+  .badge.ok { border-color: rgba(152,195,121,.35); color: var(--green); }
+  .badge.priv { border-color: rgba(124,156,255,.4); color: var(--accent); }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin-top: 18px; }
+  .meta .cell { border: 1px solid var(--border-soft); border-radius: 10px; padding: 10px 12px; background: var(--bg-soft); }
+  .meta .k { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); }
+  .meta .v { font-size: 13px; margin-top: 2px; color: var(--text); overflow-wrap: anywhere; }
+
+  .tabs { position: sticky; top: 0; z-index: 20; display: flex; gap: 4px; flex-wrap: wrap;
+    margin: 22px 0 18px; padding: 8px; border: 1px solid var(--border); border-radius: 12px;
+    background: rgba(11,14,20,.88); backdrop-filter: blur(10px); }
+  .tabs button { border: 0; background: transparent; color: var(--muted); padding: 7px 12px; border-radius: 8px;
+    cursor: pointer; font: inherit; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+  .tabs button:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .tabs button.active { color: var(--text); background: linear-gradient(135deg, rgba(124,156,255,.18), rgba(78,201,176,.12));
+    box-shadow: inset 0 0 0 1px rgba(124,156,255,.35); }
+  .tabs button svg { width: 15px; height: 15px; }
+
+  section.tab { display: none; animation: fade .18s ease; }
+  section.tab.active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+
+  .grid { display: grid; gap: 14px; }
+  .grid.c2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .grid.c3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); padding: 16px 18px; }
+  .card h3 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .card h3 svg { width: 17px; height: 17px; color: var(--accent); }
+  .card p { margin: 6px 0; color: var(--muted); }
+  .card p.tight { margin: 0; }
+  .hint { color: var(--dim); font-size: 12px; }
+  .callout { border-left: 3px solid var(--accent); background: rgba(124,156,255,.07); border-radius: 8px;
+    padding: 10px 14px; color: var(--muted); }
+  .callout.warn { border-color: var(--amber); background: rgba(229,192,123,.07); }
+  .callout.ok { border-color: var(--green); background: rgba(152,195,121,.07); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 16px 0; }
+  .stat { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 14px 16px; }
+  .stat .n { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  .stat .l { color: var(--dim); font-size: 12px; margin-top: 2px; }
+  .stat .d { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+  th { color: var(--dim); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  td code, p code, li code { background: var(--code-bg); border: 1px solid var(--border-soft); border-radius: 6px;
+    padding: 1px 6px; font-size: 12px; color: #c9d4ff; }
+  .table-wrap { border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: var(--panel); }
+  .table-wrap table { min-width: 640px; }
+
+  pre.block { margin: 10px 0 0; padding: 14px; background: var(--code-bg); border: 1px solid var(--border-soft);
+    border-radius: 10px; overflow: auto; font-size: 12.5px; line-height: 1.6; color: #cdd6ea; }
+  pre.tree { color: #b9c3d8; }
+  .kw { color: var(--purple); }
+  .str { color: var(--green); }
+  .cmt { color: var(--dim); }
+  .fn { color: var(--accent); }
+
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; border: 1px solid var(--border); color: var(--muted); }
+  .chip.done { color: var(--green); border-color: rgba(152,195,121,.4); background: rgba(152,195,121,.08); }
+  .chip.wip { color: var(--amber); border-color: rgba(229,192,123,.4); background: rgba(229,192,123,.08); }
+  .chip.todo { color: var(--dim); }
+  .chip.api { color: var(--accent); border-color: rgba(124,156,255,.35); background: rgba(124,156,255,.08); font-family: var(--mono); }
+
+  .diagram { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 12px; overflow: auto; }
+  .diagram .mermaid { min-width: 520px; }
+  .chart-box { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 14px; }
+  .chart-box h4 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .chart-box .holder { position: relative; height: 240px; }
+
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .icon-item { border: 1px solid var(--border-soft); border-radius: 10px; background: var(--bg-soft); padding: 12px; display: flex; gap: 10px; align-items: center; }
+  .icon-item svg { width: 22px; height: 22px; color: var(--accent); flex: none; }
+  .icon-item .name { font-size: 12.5px; }
+  .icon-item .desc { font-size: 11px; color: var(--dim); }
+
+  .filter { display: flex; gap: 8px; margin: 0 0 12px; }
+  .filter input { flex: 1; background: var(--bg-soft); border: 1px solid var(--border); color: var(--text);
+    border-radius: 9px; padding: 9px 12px; font: inherit; outline: none; }
+  .filter input:focus { border-color: rgba(124,156,255,.55); }
+  .copy-btn { border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); border-radius: 6px;
+    padding: 2px 7px; font-size: 11px; cursor: pointer; }
+  .copy-btn:hover { color: var(--text); border-color: rgba(124,156,255,.5); }
+
+  .steps { display: grid; gap: 8px; counter-reset: step; }
+  .step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; }
+  .step .dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+    background: rgba(124,156,255,.14); color: var(--accent); border: 1px solid rgba(124,156,255,.35); }
+  .step .body b { font-size: 13px; }
+  .step .body p { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+
+  .progress { height: 8px; border-radius: 999px; background: var(--bg-soft); border: 1px solid var(--border-soft); overflow: hidden; }
+  .progress > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+  ul.clean { margin: 6px 0; padding-left: 18px; color: var(--muted); }
+  ul.clean li { margin: 3px 0; }
+  .kbd { border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 0 6px;
+    font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel-2); }
+  footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--border-soft); color: var(--dim); font-size: 12px;
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+  @media (max-width: 720px) {
+    .app { padding: 16px 12px 40px; }
+    .hero { padding: 18px; }
+    .hero h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-brain" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V4.5A2.5 2.5 0 0 0 9 4Zm6 0a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/></symbol>
+    <symbol id="i-obsidian" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M12 2 5 7l1 11 6 4 6-4 1-11-7-5Zm0 0v20M6 7l6 4 6-4M7 18l5-7 5 7"/></symbol>
+    <symbol id="i-cdp" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 7h16v10H4zM8 12h8M9 4h6M12 4v3"/></symbol>
+    <symbol id="i-rest" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 12h6m4 0h6M7 8l-3 4 3 4m10-8 3 4-3 4"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M3 5h18v4H3zM5 9v10h14V9M10 13h4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M9 9h10v12H9zM5 15H3V3h10v2"/></symbol>
+    <symbol id="i-dispatch" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="m4 12 16-7-7 16-2-7-7-2Z"/></symbol>
+    <symbol id="i-task" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5"/></symbol>
+    <symbol id="i-session" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v11H9l-5 4V5Z"/></symbol>
+    <symbol id="i-vault" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 4h16v16H4zM4 9h16M9 9v11"/></symbol>
+    <symbol id="i-layout" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M4 4h16v16H4zM4 12h16M12 4v16"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v14H4zM8 10l2 2-2 2M12 15h4"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4Zm12 3h2v13"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="m3 6 6-2 6 2 6-2v14l-6 2-6-2-6 2V6Zm6-2v14m6-12v14"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="hero">
+    <div class="logo-row">
+      <div class="logo"><svg><use href="#i-brain"/></svg></div>
+      <div>
+        <div class="hint" style="letter-spacing:1.4px">OPENCHAMBER EXTENSION · PRIVATE</div>
+        <h1>Obsidian Panel — 架构与功能总览</h1>
+      </div>
+    </div>
+    <p class="sub">把 Brain 任务中枢与真实本地 Obsidian 窗口合并进 OpenChamber 右侧面板：CDP 拉帧、输入转发、Local REST API 桥、会话归档与复制。本页是后续迭代的可视化地图。</p>
+    <div class="badges">
+      <span class="badge priv"><b>private</b> · openchamber-obsidian</span>
+      <span class="badge"><b>v0.1.0</b> · apiVersion 1</span>
+      <span class="badge ok"><b>Apache-2.0</b></span>
+      <span class="badge">OpenChamber ≥ 2.0.1</span>
+      <span class="badge">SDK 2.6.0</span>
+      <span class="badge">2026-11-15</span>
+    </div>
+    <div class="meta">
+      <div class="cell"><div class="k">Repository</div><div class="v"><a href="https://github.com/wbi35772/openchamber-obsidian" target="_blank" rel="noreferrer">github.com/wbi35772/openchamber-obsidian</a></div></div>
+      <div class="cell"><div class="k">Source</div><div class="v"><code>projects/obsidian-panel</code></div></div>
+      <div class="cell"><div class="k">Install</div><div class="v"><code>%USERPROFILE%\.config\openchamber\extensions\obsidian-panel</code></div></div>
+      <div class="cell"><div class="k">Vault</div><div class="v"><code>D:\brain</code> · REST 27223</div></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="active"><svg><use href="#i-map"/></svg>总览</button>
+    <button data-tab="arch"><svg><use href="#i-layout"/></svg>架构</button>
+    <button data-tab="flow"><svg><use href="#i-dispatch"/></svg>数据流</button>
+    <button data-tab="features"><svg><use href="#i-brain"/></svg>功能地图</button>
+    <button data-tab="api"><svg><use href="#i-rest"/></svg>API 路由</button>
+    <button data-tab="archive"><svg><use href="#i-archive"/></svg>会话归档</button>
+    <button data-tab="copy"><svg><use href="#i-copy"/></svg>复制选项</button>
+    <button data-tab="files"><svg><use href="#i-terminal"/></svg>文件结构</button>
+    <button data-tab="roadmap"><svg><use href="#i-book"/></svg>迭代路线</button>
+    <button data-tab="icons"><svg><use href="#i-vault"/></svg>图标图例</button>
+  </nav>
+
+  <main>
+    <section class="tab active" id="tab-overview">
+      <div class="stats">
+        <div class="stat"><div class="n">11</div><div class="l">源码模块（src/）</div><div class="d">≈ 5.8k 行</div></div>
+        <div class="stat"><div class="n">4</div><div class="l">构建产物</div><div class="d">service / panel / brain / section</div></div>
+        <div class="stat"><div class="n">30+</div><div class="l">HTTP 路由</div><div class="d">窗口 · 镜像 · 金库 · 会话</div></div>
+        <div class="stat"><div class="n">6</div><div class="l">复制模式</div><div class="d">对齐 OpenChamber</div></div>
+        <div class="stat"><div class="n">60s</div><div class="l">自动归档节流</div><div class="d">仅空闲会话</div></div>
+      </div>
+
+      <div class="grid c2">
+        <div class="card">
+          <h3><svg><use href="#i-layout"/></svg>三层结构</h3>
+          <p><b>渲染层</b>：panel/ 与 brain/ 只负责 UI；<b>服务层</b>：service/ 持有 CDP、窗口句柄、REST 写队列；<b>知识层</b>：Obsidian vault（D:\brain）与任务卡。</p>
+          <p class="tight hint">面板从不直接连 Obsidian，一切经过宿主代理 → guest service。</p>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-cdp"/></svg>镜像原理</h3>
+          <p>Obsidian 以 <code>--remote-debugging-port</code> 启动，服务用 CDP 截帧（JPEG），面板长轮询 <code>surface-frame</code> 渲染到 canvas，并把指针/滚轮/键盘/IME/粘贴转成 <code>surface-input</code>。</p>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-archive"/></svg>闭环</h3>
+          <p>知识库项目 → 任务卡 → 派发 Agent → 会话归档回写任务卡 → 复制/导出。所有状态都落在 vault 的 Markdown frontmatter 里，可被 Dataview 查询。</p>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-vault"/></svg>多金库</h3>
+          <p>一个 Obsidian 进程可开多个窗口，每个窗口一个 vault；服务按标题匹配 target，面板顶部标签切换，无需重启。</p>
+        </div>
+      </div>
+
+      <div class="grid c2" style="margin-top:14px">
+        <div class="chart-box">
+          <h4>源码行数（src/，按模块）</h4>
+          <div class="holder"><canvas id="chart-src"></canvas></div>
+        </div>
+        <div class="chart-box">
+          <h4>构建产物体积（字节）</h4>
+          <div class="holder"><canvas id="chart-build"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-arch">
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph HOST["OpenChamber Host (Electron)"]
+    SHELL["Left rail / projects / sessions"]
+    PROXY["guest service proxy<br/>POST /api/guests/obsidian-panel/service/request"]
+  end
+
+  subgraph EXT["obsidian-panel extension"]
+    PANEL["panel/index.html<br/>self-drawn split rail"]
+    BRAIN["brain/index.html + section.html<br/>Brain task hub"]
+    SVC["service/main.js<br/>HTTP routes"]
+    CDP["cdp.js<br/>DevTools client"]
+    SURF["surface.js<br/>frame + input"]
+    WIN["window.js<br/>Win32 window control"]
+    OBS["obsidian.js<br/>lifecycle / vaults / watchdog"]
+    REST["rest.js<br/>Local REST client<br/>If-Match single writer"]
+  end
+
+  subgraph VAULT["Obsidian"]
+    APP["Obsidian.exe<br/>remote debugging port"]
+    NOTE["vault D:\\brain<br/>tasks · notes · 会话记录"]
+    API["Local REST API :27223"]
+  end
+
+  SHELL --> PANEL
+  SHELL --> BRAIN
+  PANEL -->|serviceRequest| PROXY
+  BRAIN -->|serviceRequest| PROXY
+  PROXY --> SVC
+  SVC --> CDP
+  SVC --> SURF
+  SVC --> WIN
+  SVC --> OBS
+  SVC --> REST
+  CDP -->|WebSocket| APP
+  SURF --> CDP
+  OBS --> WIN
+  REST -->|HTTPS| API
+  API --> NOTE
+        </pre>
+      </div>
+
+      <div class="grid c2" style="margin-top:14px">
+        <div class="card">
+          <h3>能力与权限</h3>
+          <table>
+            <tr><th>项</th><th>值</th></tr>
+            <tr><td>capabilities</td><td><code>sessions</code>, <code>prompt</code></td></tr>
+            <tr><td>service.runtime</td><td><code>host</code></td></tr>
+            <tr><td>exec 白名单</td><td><code>Obsidian.exe</code>, <code>powershell.exe</code>, <code>tasklist.exe</code></td></tr>
+            <tr><td>panel entry</td><td><code>panel/index.html</code></td></tr>
+            <tr><td>page entry</td><td><code>brain/index.html</code></td></tr>
+            <tr><td>statusSection</td><td><code>brain/section.html</code> · 320px</td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <h3>设计取舍</h3>
+          <ul class="clean">
+            <li>不用 <code>service.surface</code>：宿主 dock 无法承载分栏，改为在 <code>panel.entry</code> 内自绘。</li>
+            <li>不用网页版 Obsidian：必须真实本地窗口，才能复用插件与本地文件。</li>
+            <li>不重排 D 盘编号：brain 是知识层，D 盘是资产层，用台账映射。</li>
+            <li>写操作单队列 + 文档版本号（If-Match），412 自动重试。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout warn" style="margin-top:14px">
+        <b>已知限制：</b>宿主 Electron 渲染器无 <code>DevToolsActivePort</code>，无法 CDP 挂 UI；验证依赖假宿主 harness 与人工 <span class="kbd">Ctrl</span>+<span class="kbd">R</span>。宿主不广播 settings 变更，新项目需刷新左栏。
+      </div>
+    </section>
+
+    <section class="tab" id="tab-flow">
+      <div class="grid">
+        <div class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U as 用户
+  participant B as Brain 面板
+  participant S as guest service
+  participant H as OpenChamber Host
+  participant V as Obsidian REST
+  U->>B: 点击「派发到 Agent」
+  B->>S: POST /obsidian/rest/tasks (读取任务)
+  S->>V: GET note + frontmatter
+  V-->>S: 任务正文
+  S-->>B: 任务简报
+  B->>H: host.startSession({ text, projectId, url })
+  H-->>B: sessionId
+  B->>S: POST /obsidian/rest/frontmatter
+  S->>V: 写 session_id + status=running
+  V-->>S: 412? 重试
+  S-->>B: ok
+          </pre>
+        </div>
+        <div class="diagram">
+          <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant B as Brain 面板
+  participant S as guest service
+  participant H as OpenChamber API
+  participant V as vault
+  B->>S: POST /obsidian/rest/session/archive { sessionId, auto }
+  S->>H: GET /api/session/{id}
+  S->>H: GET /api/session/{id}/message?limit=200&order=asc
+  loop cursor.next
+    S->>H: GET message?cursor=...
+  end
+  S->>S: renderSessionArchive() 按用户回合分组
+  S->>V: 写 会话记录/<项目>/<标题>-<日期>.md
+  S->>V: 任务卡写 archive_path / archived_at / session_updated
+  S-->>B: { path, messageCount, turnCount, bytes }
+          </pre>
+        </div>
+        <div class="diagram">
+          <pre class="mermaid">
+stateDiagram-v2
+  [*] --> pending: 新建任务
+  pending --> running: 派发到 Agent
+  running --> done: 标记完成
+  running --> running: 追加执行日志
+  running --> archived: 归档会话
+  done --> archived: 归档会话
+  archived --> running: 重新派发
+  pending --> [*]: 删除
+          </pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-features">
+      <div class="grid c2">
+        <div class="card">
+          <h3><svg><use href="#i-layout"/></svg>合并右栏</h3>
+          <p>Brain 与 Obsidian 同一面板；上下 / 左右二选一，分隔条可拖拽、可键盘调整、双击复位（0.38）。布局存 <code>panel-layout</code>。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-cdp"/></svg>真实镜像</h3>
+          <p>长轮询帧 + 输入转发（指针、滚轮、键盘、IME、剪贴板、缩放）；看门狗在 Obsidian 最小化后自动恢复。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-task"/></svg>任务中枢</h3>
+          <p>项目下拉（OpenChamber + vault-only）、任务列表、状态编辑、执行日志、连续新建任务、派发、写入对话、打开笔记。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-vault"/></svg>项目注册</h3>
+          <p>新建 vault 项目后自动写入 OpenChamber <code>settings.json</code>（<code>path_&lt;base64url&gt;</code> id），按路径去重并保留 activeProjectId。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-archive"/></svg>会话归档</h3>
+          <p>按 OpenChamber 导出格式拉取消息，按用户回合分组，工具调用折叠进 <code>&lt;details&gt;</code>；60 秒自动归档空闲会话。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-copy"/></svg>复制菜单</h3>
+          <p>六个模式与 OpenChamber 对齐：会话 ID、链接、Markdown、纯文本、最后回答、最后一轮；宿主剪贴板优先。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-rest"/></svg>MCP 桥</h3>
+          <p>Local REST API 暴露给 cyanheads MCP（12 工具），Agent 可直接读写 vault；写路径走单队列版本号。</p>
+          <span class="chip done">已上线</span>
+        </div>
+        <div class="card">
+          <h3><svg><use href="#i-book"/></svg>Docs / Rules 注入</h3>
+          <p>派发时把项目 AGENTS.md / 规则片段注入会话；Brain 侧增加 Docs/Rules 标签。</p>
+          <span class="chip todo">待实现</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>功能覆盖率</h3>
+        <div class="progress" style="margin:10px 0 6px"><i style="width:82%"></i></div>
+        <p class="hint">8 项核心能力中 7 项已上线；剩余：Docs/Rules 注入、架构图谱（Canvas + Breadcrumbs/Juggl）。</p>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-api">
+      <div class="filter">
+        <input id="api-filter" type="search" placeholder="过滤路由，例如 session、surface、project …">
+      </div>
+      <div class="table-wrap">
+        <table id="api-table">
+          <thead><tr><th>分组</th><th>方法</th><th>路径</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td>窗口</td><td>GET</td><td><code>/obsidian/status</code></td><td>运行状态、CDP 端口、当前 target、已开 vault</td></tr>
+            <tr><td>窗口</td><td>GET</td><td><code>/obsidian/targets</code></td><td>刷新并列出 CDP targets</td></tr>
+            <tr><td>窗口</td><td>POST</td><td><code>/obsidian/select</code></td><td>切换 vault 标签</td></tr>
+            <tr><td>窗口</td><td>POST</td><td><code>/obsidian/open</code></td><td>按路径打开或新建 vault</td></tr>
+            <tr><td>窗口</td><td>POST</td><td><code>/obsidian/launch</code></td><td>带调试端口启动 Obsidian</td></tr>
+            <tr><td>窗口</td><td>POST</td><td><code>/obsidian/restart</code></td><td>重启 Obsidian</td></tr>
+            <tr><td>窗口</td><td>POST</td><td><code>/obsidian/show</code></td><td>窗口置前</td></tr>
+            <tr><td>窗口</td><td>GET/POST</td><td><code>/obsidian/pick</code></td><td>原生文件夹选择会话</td></tr>
+            <tr><td>镜像</td><td>POST</td><td><code>/obsidian/rest/surface-frame</code></td><td>长轮询帧 {after, wait} → {seq,width,height,mime,data}</td></tr>
+            <tr><td>镜像</td><td>POST</td><td><code>/obsidian/rest/surface-input</code></td><td>输入事件批量转发（≤256）</td></tr>
+            <tr><td>镜像</td><td>POST</td><td><code>/obsidian/rest/surface-control</code></td><td>取得/释放控制权</td></tr>
+            <tr><td>镜像</td><td>POST</td><td><code>/obsidian/rest/surface-resize</code></td><td>调整镜像视口</td></tr>
+            <tr><td>镜像</td><td>POST</td><td><code>/obsidian/rest/surface-clipboard</code></td><td>读取页面选区</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/service-info</code></td><td>REST 服务信息</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/projects</code></td><td>vault 项目列表</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/note</code></td><td>读取笔记</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/frontmatter</code></td><td>写 frontmatter（If-Match）</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/append</code></td><td>追加执行日志</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/open</code></td><td>http(s) 跳转页（供 startSession）</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/search</code></td><td>全文搜索</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/list</code></td><td>目录列表</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/outline</code></td><td>标题大纲</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/section</code></td><td>按标题取段落</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/write</code></td><td>整篇写入</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/project/init</code></td><td>初始化项目目录与任务文件夹</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/project/register</code></td><td>写入 OpenChamber settings 项目列表</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/task/create</code></td><td>新建任务卡</td></tr>
+            <tr><td>金库</td><td>—</td><td><code>/obsidian/rest/tasks</code></td><td>任务列表</td></tr>
+            <tr><td>会话</td><td>POST</td><td><code>/obsidian/rest/session/archive</code></td><td>归档会话并回写任务卡</td></tr>
+            <tr><td>会话</td><td>POST</td><td><code>/obsidian/rest/session/export</code></td><td>复制文本（6 模式，无需 vaultPath）</td></tr>
+            <tr><td>配置</td><td>—</td><td><code>/obsidian/rest/config</code></td><td>扩展配置读写</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint" style="margin-top:10px">宿主代理：<code>POST http://127.0.0.1:53253/api/guests/obsidian-panel/service/request</code> · body <code>{ method, path, body, viewerId }</code></p>
+    </section>
+
+    <section class="tab" id="tab-archive">
+      <div class="grid c2">
+        <div class="card">
+          <h3><svg><use href="#i-archive"/></svg>归档流水线</h3>
+          <div class="steps">
+            <div class="step"><div class="dot">1</div><div class="body"><b>读取会话</b><p>GET /api/session/{id}，判断 idle（time.updated ≤ time.idle）。</p></div></div>
+            <div class="step"><div class="dot">2</div><div class="body"><b>分页拉消息</b><p>limit=200&amp;order=asc，之后只用 cursor.next（不能再带 order）。</p></div></div>
+            <div class="step"><div class="dot">3</div><div class="body"><b>渲染</b><p>按用户回合分组；助手正文保留，工具调用折叠进 &lt;details&gt;。</p></div></div>
+            <div class="step"><div class="dot">4</div><div class="body"><b>写文件</b><p><code>会话记录/&lt;项目&gt;/&lt;标题&gt;-&lt;YYYY-MM-DD&gt;.md</code>，frontmatter 记 session_id。</p></div></div>
+            <div class="step"><div class="dot">5</div><div class="body"><b>回写任务卡</b><p>archive_path / archived_at / session_updated；同名会话按 session_id 去重。</p></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>自动归档规则</h3>
+          <ul class="clean">
+            <li>每 60 秒检查一次已派发任务；仅当会话空闲且有新内容才写。</li>
+            <li><code>auto: true</code> 跳过 busy / unchanged / empty；<code>force: true</code> 强制重写。</li>
+            <li>任务卡 frontmatter 设 <code>auto_archive: false</code> 可关闭该任务。</li>
+            <li>实测样本：2735 条消息 / 48 轮 / 461 KB。</li>
+          </ul>
+          <pre class="block"><span class="cmt">---</span>
+<span class="kw">type</span>: SessionArchive
+<span class="kw">session_id</span>: ses_e60b87318ffeQlTAaGbNKYWmNI
+<span class="kw">session_updated</span>: 2026-11-06T09:12:44.000Z
+<span class="kw">message_count</span>: 2879
+<span class="kw">turn_count</span>: 49
+<span class="kw">task_path</span>: 20-笔记/项目/初始配置/任务/xxx.md
+<span class="cmt">---</span>
+
+<span class="cmt"># 会话标题</span>
+<span class="cmt">*Exported on 2026-11-06*</span>
+
+**User**
+
+你好
+
+**Assistant**
+
+...</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-copy">
+      <div class="grid c3">
+        <div class="card"><h3><svg><use href="#i-copy"/></svg>复制会话 ID</h3><p>纯文本 sessionId，用于脚本、API 或深链。</p><pre class="block">ses_e60b87318ffeQlTAaGbNKYWmNI</pre></div>
+        <div class="card"><h3><svg><use href="#i-rest"/></svg>复制会话链接</h3><p>Web 链接：<code>{origin}/?session=ID&amp;message=ID</code>。</p><pre class="block">http://127.0.0.1:53253/?session=ses_...</pre></div>
+        <div class="card"><h3><svg><use href="#i-archive"/></svg>复制会话 Markdown</h3><p>完整正文 + 工具调用，保留标题层级与代码块。</p><pre class="block"># 标题
+*Exported on ...*
+
+**User** ...</pre></div>
+        <div class="card"><h3><svg><use href="#i-task"/></svg>复制纯文本</h3><p>去掉 Markdown 标记的纯文本，适合粘贴到聊天窗口。</p><pre class="block">用户: 你好
+助手: ...</pre></div>
+        <div class="card"><h3><svg><use href="#i-session"/></svg>复制最后回答</h3><p>只取最后一条助手消息的正文。</p><pre class="block">（最后一条回答）</pre></div>
+        <div class="card"><h3><svg><use href="#i-dispatch"/></svg>复制最后一轮</h3><p>最后一条用户消息 + 对应助手回答。</p><pre class="block">**User** ...
+**Assistant** ...</pre></div>
+      </div>
+      <div class="callout ok" style="margin-top:14px">
+        接口：<code>POST /obsidian/rest/session/export</code> · <code>mode = markdown | plain | last-answer | last-turn | link | id</code> · 返回 <code>{ text, messageCount, turnCount, bytes }</code>。复制优先走宿主 <code>host.writeClipboard</code>，失败回退 <code>navigator.clipboard</code>。
+      </div>
+      <div class="callout warn" style="margin-top:10px">
+        菜单按钮仅在任务有 <code>session_id</code> 且不忙时可用；没有会话的任务先「派发到 Agent」。按钮的灰色是二级按钮样式，不是禁用态。
+      </div>
+    </section>
+
+    <section class="tab" id="tab-files">
+      <div class="grid c2">
+        <div class="card">
+          <h3>仓库结构</h3>
+          <pre class="block tree">obsidian-panel/
+├─ package.json          扩展清单（panel/page/section/service）
+├─ icon.svg              扩展图标
+├─ LICENSE               Apache-2.0
+├─ README.md             使用与路由说明
+├─ panel/
+│  ├─ index.html         合并面板 DOM + 全部样式
+│  └─ main.js            构建产物（IIFE）
+├─ brain/
+│  ├─ index.html|main.js         全屏 Brain
+│  └─ section.html|section.js    左侧紧凑状态区
+├─ service/main.js       构建产物（ESM，Node）
+├─ src/
+│  ├─ panel.js           分栏容器 / 帧轮询 / 坐标映射
+│  ├─ brainpane.js       createBrainPane（三处共用）
+│  ├─ brain.js           全屏 Brain 入口
+│  ├─ section.js         紧凑入口
+│  ├─ service.js         HTTP 路由 + surface 桥 + REST 桥
+│  ├─ obsidian.js        CDP 运行时 / 多 vault / 看门狗
+│  ├─ surface.js         CDP 截图 + 输入分发
+│  ├─ cdp.js             CDP 客户端
+│  ├─ window.js          Win32 窗口控制
+│  ├─ rest.js            Local REST 客户端
+│  └─ main.js            service 启动入口
+├─ scripts/
+│  ├─ build.mjs          esbuild 构建
+│  ├─ install-plugins.mjs  T0 插件预装
+│  └─ dev/               调试脚本（dock-context / geometry / shrink）
+└─ docs/STATUS.md        交接快照</pre>
+        </div>
+        <div class="card">
+          <h3>源码行数分布</h3>
+          <div id="treemap" style="height:300px; margin-top:8px"></div>
+          <p class="hint">面积 = 行数。brain.js 与 brainpane.js 占大头；service.js 是路由与渲染核心。</p>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead><tr><th>构建产物</th><th>格式</th><th>体积</th><th>行数</th><th>说明</th></tr></thead>
+          <tbody>
+            <tr><td><code>service/main.js</code></td><td>ESM</td><td>234,151 B</td><td>6,424</td><td>HTTP 路由 + CDP + REST 桥</td></tr>
+            <tr><td><code>panel/main.js</code></td><td>IIFE</td><td>145,117 B</td><td>3,459</td><td>分栏 + 镜像 + Brain</td></tr>
+            <tr><td><code>brain/main.js</code></td><td>IIFE</td><td>123,602 B</td><td>2,836</td><td>全屏 Brain</td></tr>
+            <tr><td><code>brain/section.js</code></td><td>IIFE</td><td>120,600 B</td><td>2,732</td><td>左侧紧凑状态区</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-roadmap">
+      <div class="grid c2">
+        <div class="card">
+          <h3>已完成</h3>
+          <ul class="clean">
+            <li>右栏合并面板 + 布局持久化（panel-layout）</li>
+            <li>CDP 镜像、输入转发、看门狗、多 vault</li>
+            <li>Brain 任务 CRUD、连续新建、派发、写入对话</li>
+            <li>新建项目注册进 OpenChamber settings</li>
+            <li>Local REST 客户端 + If-Match 单写队列</li>
+            <li>会话归档（手动 + 60s 自动）</li>
+            <li>复制菜单（6 模式，对齐 OpenChamber）</li>
+            <li>MCP 桥（cyanheads，12 工具）</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>待办（按优先级）</h3>
+          <ul class="clean">
+            <li><span class="chip wip">P1</span> Docs / Rules 注入：派发时把 AGENTS.md 片段写进会话。</li>
+            <li><span class="chip wip">P1</span> 架构图谱：20 个节点 + 类型边，生成 <code>30-地图/架构.canvas</code>，接 Breadcrumbs / Juggl。</li>
+            <li><span class="chip todo">P2</span> B 卷底座映射：D:\brain 顶层结构映射到中文目录，不重排编号。</li>
+            <li><span class="chip todo">P2</span> 左侧 statusSection 取舍：只保留右栏 Brain 时从 manifest 删除。</li>
+            <li><span class="chip todo">P3</span> 会话归档增强：按标签分组、附件与图片转存。</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>维护手册</h3>
+        <pre class="block"><span class="cmt"># 构建与语法检查</span>
+cd projects/obsidian-panel
+npm run build
+node --check panel/main.js
+node --check brain/section.js
+node --check service/main.js
+
+<span class="cmt"># 同步到已安装扩展（9 个文件）</span>
+$src = (Get-Location).Path
+$dst = "$env:USERPROFILE\.config\openchamber\extensions\obsidian-panel"
+foreach ($f in 'package.json','icon.svg','panel\index.html','panel\main.js','brain\index.html','brain\main.js','brain\section.html','brain\section.js','service\main.js') {
+  Copy-Item -Force (Join-Path $src $f) (Join-Path $dst $f)
+}
+
+<span class="cmt"># 重载宿主</span>
+<span class="cmt"># Ctrl+R（宿主会重启 guest service）</span>
+
+<span class="cmt"># 推送（需要代理）</span>
+$env:HTTPS_PROXY = 'http://127.0.0.1:10809'
+git push origin main</pre>
+      </div>
+    </section>
+
+    <section class="tab" id="tab-icons">
+      <div class="icon-grid">
+        <div class="icon-item"><svg><use href="#i-brain"/></svg><div><div class="name">Brain</div><div class="desc">任务中枢 / 知识层</div></div></div>
+        <div class="icon-item"><svg><use href="#i-obsidian"/></svg><div><div class="name">Obsidian</div><div class="desc">本地窗口 / vault</div></div></div>
+        <div class="icon-item"><svg><use href="#i-cdp"/></svg><div><div class="name">CDP</div><div class="desc">调试协议 / 截帧</div></div></div>
+        <div class="icon-item"><svg><use href="#i-rest"/></svg><div><div class="name">REST</div><div class="desc">Local REST API 桥</div></div></div>
+        <div class="icon-item"><svg><use href="#i-archive"/></svg><div><div class="name">归档</div><div class="desc">会话记录落盘</div></div></div>
+        <div class="icon-item"><svg><use href="#i-copy"/></svg><div><div class="name">复制</div><div class="desc">六种导出模式</div></div></div>
+        <div class="icon-item"><svg><use href="#i-dispatch"/></svg><div><div class="name">派发</div><div class="desc">启动 Agent 会话</div></div></div>
+        <div class="icon-item"><svg><use href="#i-task"/></svg><div><div class="name">任务</div><div class="desc">任务卡 / 状态</div></div></div>
+        <div class="icon-item"><svg><use href="#i-session"/></svg><div><div class="name">会话</div><div class="desc">OpenChamber session</div></div></div>
+        <div class="icon-item"><svg><use href="#i-vault"/></svg><div><div class="name">金库</div><div class="desc">多 vault 标签</div></div></div>
+        <div class="icon-item"><svg><use href="#i-layout"/></svg><div><div class="name">布局</div><div class="desc">上下 / 左右分栏</div></div></div>
+        <div class="icon-item"><svg><use href="#i-terminal"/></svg><div><div class="name">构建</div><div class="desc">esbuild / 脚本</div></div></div>
+        <div class="icon-item"><svg><use href="#i-book"/></svg><div><div class="name">文档</div><div class="desc">STATUS / README</div></div></div>
+        <div class="icon-item"><svg><use href="#i-map"/></svg><div><div class="name">地图</div><div class="desc">架构 / 数据流</div></div></div>
+      </div>
+      <div class="callout" style="margin-top:14px">
+        图标全部为内联 SVG（stroke=currentColor），无外部依赖；新增模块时沿用这套 24×24 线性图标，保持面板与文档一致。
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>OpenChamber Obsidian Panel · 架构与功能总览</span>
+    <span>HEAD a4c7345 · 2026-11-15 · 私有仓库 openchamber-obsidian</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var tabs = document.getElementById("tabs");
+  var buttons = tabs ? tabs.querySelectorAll("button[data-tab]") : [];
+  var sections = document.querySelectorAll("section.tab");
+  function activate(name) {
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].classList.toggle("active", buttons[i].getAttribute("data-tab") === name);
+    }
+    for (var j = 0; j < sections.length; j++) {
+      sections[j].classList.toggle("active", sections[j].id === "tab-" + name);
+    }
+    if (name === "files") drawTreemap();
+    if (name === "overview") drawCharts();
+  }
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].addEventListener("click", function () { activate(this.getAttribute("data-tab")); });
+  }
+
+  var filter = document.getElementById("api-filter");
+  if (filter) {
+    filter.addEventListener("input", function () {
+      var q = this.value.trim().toLowerCase();
+      var rows = document.querySelectorAll("#api-table tbody tr");
+      for (var r = 0; r < rows.length; r++) {
+        var text = rows[r].textContent.toLowerCase();
+        rows[r].style.display = !q || text.indexOf(q) >= 0 ? "" : "none";
+      }
+    });
+  }
+
+  var copyButtons = document.querySelectorAll("[data-copy]");
+  for (var c = 0; c < copyButtons.length; c++) {
+    copyButtons[c].addEventListener("click", function () {
+      var value = this.getAttribute("data-copy") || "";
+      var label = this;
+      var done = function () { var old = label.textContent; label.textContent = "已复制"; setTimeout(function () { label.textContent = old; }, 1200); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(done).catch(function () {});
+      }
+    });
+  }
+
+  var chartsDrawn = false;
+  function drawCharts() {
+    if (chartsDrawn || !window.Chart) return;
+    chartsDrawn = true;
+    var grid = "rgba(255,255,255,.06)";
+    var tick = "#8f98ad";
+    var srcCtx = document.getElementById("chart-src");
+    if (srcCtx) {
+      new Chart(srcCtx, {
+        type: "bar",
+        data: {
+          labels: ["brain.js", "service.js", "brainpane.js", "panel.js", "obsidian.js", "rest.js", "surface.js", "cdp.js", "window.js", "main.js", "section.js"],
+          datasets: [{ label: "行数", data: [1145, 1065, 1038, 800, 644, 455, 295, 145, 142, 51, 5],
+            backgroundColor: "rgba(124,156,255,.55)", borderColor: "#7c9cff", borderWidth: 1, borderRadius: 4 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { ticks: { color: tick, maxRotation: 45, minRotation: 45 }, grid: { color: grid } },
+                    y: { ticks: { color: tick }, grid: { color: grid } } } }
+      });
+    }
+    var buildCtx = document.getElementById("chart-build");
+    if (buildCtx) {
+      new Chart(buildCtx, {
+        type: "doughnut",
+        data: { labels: ["service", "panel", "brain", "section"],
+          datasets: [{ data: [234151, 145117, 123602, 120600],
+            backgroundColor: ["rgba(124,156,255,.65)", "rgba(78,201,176,.65)", "rgba(198,120,221,.65)", "rgba(229,192,123,.65)"],
+            borderColor: "#121722", borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: "58%",
+          plugins: { legend: { position: "bottom", labels: { color: tick, boxWidth: 10 } } } }
+      });
+    }
+  }
+
+  var treemapDrawn = false;
+  function drawTreemap() {
+    if (treemapDrawn || !window.d3) return;
+    treemapDrawn = true;
+    var host = document.getElementById("treemap");
+    if (!host) return;
+    var data = [
+      { name: "brain.js", value: 1145 }, { name: "service.js", value: 1065 },
+      { name: "brainpane.js", value: 1038 }, { name: "panel.js", value: 800 },
+      { name: "obsidian.js", value: 644 }, { name: "rest.js", value: 455 },
+      { name: "surface.js", value: 295 }, { name: "cdp.js", value: 145 },
+      { name: "window.js", value: 142 }, { name: "main.js", value: 51 },
+      { name: "section.js", value: 5 }
+    ];
+    var width = host.clientWidth || 480;
+    var height = 300;
+    var colors = ["#7c9cff", "#4ec9b0", "#c678dd", "#e5c07b", "#e06c75", "#98c379", "#56b6c2", "#abb2bf"];
+    var svg = d3.select(host).append("svg").attr("viewBox", "0 0 " + width + " " + height).attr("width", "100%").attr("height", height);
+    var root = d3.hierarchy({ children: data }).sum(function (d) { return d.value || 0; });
+    d3.treemap().size([width, height]).paddingInner(3).paddingOuter(3)(root);
+    var leaves = root.leaves();
+    var g = svg.selectAll("g").data(leaves).enter().append("g");
+    g.append("rect")
+      .attr("x", function (d) { return d.x0; })
+      .attr("y", function (d) { return d.y0; })
+      .attr("width", function (d) { return Math.max(0, d.x1 - d.x0); })
+      .attr("height", function (d) { return Math.max(0, d.y1 - d.y0); })
+      .attr("rx", 6)
+      .attr("fill", function (d, i) { return colors[i % colors.length]; })
+      .attr("opacity", 0.28)
+      .attr("stroke", function (d, i) { return colors[i % colors.length]; });
+    g.append("text")
+      .attr("x", function (d) { return d.x0 + 8; })
+      .attr("y", function (d) { return d.y0 + 18; })
+      .attr("fill", "#e7ebf3").attr("font-size", 12).attr("font-family", "ui-monospace, Consolas, monospace")
+      .text(function (d) { return d.data.name; });
+    g.append("text")
+      .attr("x", function (d) { return d.x0 + 8; })
+      .attr("y", function (d) { return d.y0 + 34; })
+      .attr("fill", "#8f98ad").attr("font-size", 11)
+      .text(function (d) { return d.data.value + " 行"; });
+  }
+
+  function bootMermaid() {
+    if (!window.mermaid) return;
+    try {
+      mermaid.initialize({ startOnLoad: false, theme: "dark", securityLevel: "loose",
+        themeVariables: { background: "#121722", primaryColor: "#1b2231", primaryTextColor: "#e7ebf3",
+          primaryBorderColor: "#3a4560", lineColor: "#5b6a8c", secondaryColor: "#161c29",
+          tertiaryColor: "#0f131c", fontSize: "13px" } });
+      mermaid.run({ querySelector: ".mermaid" });
+    } catch (e) { /* leave source visible if the library is unavailable */ }
+  }
+
+  drawCharts();
+  bootMermaid();
+  setTimeout(drawTreemap, 50);
+})();
+</script>
+</body>
+</html>
